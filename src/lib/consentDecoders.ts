@@ -1,0 +1,301 @@
+// Pure TypeScript consent decoding module — no DOM, no network, no side effects.
+
+export type ConsentState = 'allowed' | 'denied' | 'unknown';
+export type ConsentSource = 'default' | 'update';
+export type ConsentMode = 'basic' | 'advanced' | 'unknown';
+export type OverallStatus = 'active' | 'incomplete' | 'missing';
+
+export interface SignalResult {
+  name: string;
+  displayName: string;
+  state: ConsentState;
+  source: ConsentSource;
+  mode: ConsentMode;
+  statusLabel: string;
+  implication: string;
+}
+
+export interface DecodeResult {
+  inputType: 'gcs' | 'gcd' | 'unknown';
+  overallStatus: OverallStatus;
+  overallSummary: string;
+  signals: SignalResult[];
+  rawInput: string;
+}
+
+// ---------------------------------------------------------------------------
+// Signal definitions
+// ---------------------------------------------------------------------------
+
+interface SignalDef {
+  name: string;
+  displayName: string;
+}
+
+const SIGNAL_DEFS: SignalDef[] = [
+  { name: 'analytics_storage', displayName: 'Analytics Storage' },
+  { name: 'ad_storage', displayName: 'Ad Storage' },
+  { name: 'ad_user_data', displayName: 'Ad User Data' },
+  { name: 'ad_personalization', displayName: 'Ad Personalisation' },
+];
+
+// Extended signals that only appear in GCD (positions 5–7)
+const EXTENDED_SIGNAL_DEFS: SignalDef[] = [
+  { name: 'personalization_storage', displayName: 'Personalisation Storage' },
+  { name: 'functionality_storage', displayName: 'Functionality Storage' },
+  { name: 'security_storage', displayName: 'Security Storage' },
+];
+
+// ---------------------------------------------------------------------------
+// Implication text helpers
+// ---------------------------------------------------------------------------
+
+function implicationText(signalName: string, state: ConsentState): string {
+  const implications: Record<string, Record<ConsentState, string>> = {
+    analytics_storage: {
+      allowed:
+        'Google Analytics cookies are active and collecting data. User browsing behaviour is being tracked for analytics purposes.',
+      denied:
+        'Google Analytics cookies are blocked. Aggregated, cookieless measurement may still occur via Consent Mode modelling.',
+      unknown:
+        'The analytics storage state could not be determined. This may mean Consent Mode is not fully configured for analytics.',
+    },
+    ad_storage: {
+      allowed:
+        'Advertising cookies are active and can store information on the user\'s device. Ad conversion tracking is fully operational.',
+      denied:
+        'Advertising cookies are blocked. Google Ads will use modelled conversions instead of direct measurement.',
+      unknown:
+        'The ad storage state could not be determined. Advertising measurement may not be working as expected.',
+    },
+    ad_user_data: {
+      allowed:
+        'User data can be sent to Google for advertising purposes. This includes data used for remarketing and audience building.',
+      denied:
+        'User data is not being sent to Google for advertising. Remarketing audiences will not include this user.',
+      unknown:
+        'It is unclear whether user data is being sent to Google for ads. Check your Consent Mode configuration.',
+    },
+    ad_personalization: {
+      allowed:
+        'Ad personalisation is enabled — Google can use this visitor\'s data to show them targeted ads. Remarketing lists are being populated.',
+      denied:
+        'Ad personalisation is off — Google will not use this visitor\'s data for ad targeting. Only contextual ads will be shown.',
+      unknown:
+        'Ad personalisation status is unclear. Targeted advertising behaviour is unpredictable for this visitor.',
+    },
+    personalization_storage: {
+      allowed:
+        'Storage related to personalisation (e.g. video recommendations) is enabled. The site can remember user preferences.',
+      denied:
+        'Personalisation storage is blocked. Features that rely on remembering preferences may not work correctly.',
+      unknown:
+        'Personalisation storage status is unknown. Preference-related features may behave unpredictably.',
+    },
+    functionality_storage: {
+      allowed:
+        'Functionality storage is enabled, supporting features like language preferences and UI customisation.',
+      denied:
+        'Functionality storage is blocked. Some site features that depend on saved settings may not work properly.',
+      unknown:
+        'Functionality storage status is unknown. Some site features may not work as expected.',
+    },
+    security_storage: {
+      allowed:
+        'Security-related storage is enabled. This supports features like fraud prevention and secure authentication.',
+      denied:
+        'Security storage is blocked. This is unusual and may affect login security and fraud prevention.',
+      unknown:
+        'Security storage status is unknown. Security features should generally remain enabled.',
+    },
+  };
+
+  return implications[signalName]?.[state] ?? 'No additional information available for this signal.';
+}
+
+function statusLabel(state: ConsentState, source: ConsentSource): string {
+  if (state === 'allowed' && source === 'update') return 'On after consent';
+  if (state === 'allowed' && source === 'default') return 'On by default';
+  if (state === 'denied' && source === 'update') return 'Off after user choice';
+  if (state === 'denied' && source === 'default') return 'Off by default';
+  return 'Status unknown';
+}
+
+// ---------------------------------------------------------------------------
+// GCS decoding
+// ---------------------------------------------------------------------------
+// GCS format: "G" followed by a 3-digit code (e.g. "G100", "G111", "G110")
+// Position mapping:
+//   Position 1 (index 1): analytics_storage — 1=allowed, 0=denied
+//   Position 2 (index 2): ad_storage        — 1=allowed, 0=denied
+//   Position 3 (index 3): ad_user_data      — 1=allowed, 0=denied
+// GCS doesn't encode ad_personalization separately; we infer it from ad_storage.
+// Values: '1' = allowed, '0' = denied, anything else = unknown
+
+const GCS_PATTERN = /^G[0-9x]{1,4}$/i;
+
+function decodeGcsChar(ch: string | undefined): ConsentState {
+  if (ch === '1') return 'allowed';
+  if (ch === '0') return 'denied';
+  return 'unknown';
+}
+
+function decodeGcs(input: string): DecodeResult {
+  const trimmed = input.trim();
+  const chars = trimmed.slice(1); // remove leading 'G'
+
+  const signals: SignalResult[] = SIGNAL_DEFS.map((def, i) => {
+    const state = decodeGcsChar(chars[i]);
+    return {
+      name: def.name,
+      displayName: def.displayName,
+      state,
+      source: 'default' as ConsentSource,
+      mode: 'unknown' as ConsentMode,
+      statusLabel: statusLabel(state, 'default'),
+      implication: implicationText(def.name, state),
+    };
+  });
+
+  const knownCount = signals.filter((s) => s.state !== 'unknown').length;
+  const overallStatus: OverallStatus =
+    knownCount === 0 ? 'missing' : knownCount === signals.length ? 'active' : 'incomplete';
+
+  const overallSummary =
+    overallStatus === 'active'
+      ? 'Consent Mode is active — all core signals are detected in this GCS value.'
+      : overallStatus === 'incomplete'
+        ? 'Consent Mode is partially configured — some signals are present but others could not be determined.'
+        : 'Consent Mode does not appear to be active based on this GCS value.';
+
+  return { inputType: 'gcs', overallStatus, overallSummary, signals, rawInput: trimmed };
+}
+
+// ---------------------------------------------------------------------------
+// GCD decoding
+// ---------------------------------------------------------------------------
+// GCD format: positional characters separated by dots or as a continuous string.
+// Common pattern: "11x1x1x1x5" (no dots) or "1.1.x.1.x.1.x.1.x.5"
+// Each pair of characters encodes one consent signal.
+//
+// Encoding per character pair (e.g. "11"):
+//   Character 1 — consent state:
+//     '1' = allowed (granted)
+//     '0' = denied
+//     'x' or '-' = unknown / not set
+//   Character 2 — source + mode flag:
+//     '1' = default + basic
+//     '5' = update + advanced
+//     '3' = default + advanced
+//     '7' = update + basic
+//     'x' or '-' = unknown
+//
+// Positional mapping (character pairs):
+//   Pair 0 (chars 0-1): analytics_storage
+//   Pair 1 (chars 2-3): ad_storage
+//   Pair 2 (chars 4-5): ad_user_data
+//   Pair 3 (chars 6-7): ad_personalization
+//   Pair 4 (chars 8-9): personalization_storage (if present)
+//   Pair 5 (chars 10-11): functionality_storage (if present)
+//   Pair 6 (chars 12-13): security_storage (if present)
+
+const GCD_PATTERN = /^[01x\-][1357x\-]([01x\-][1357x\-]){1,6}$/i;
+const GCD_DOT_PATTERN = /^[01x\-]\.[1357x\-](\.[01x\-]\.[1357x\-]){1,6}$/i;
+
+function parseGcdState(ch: string | undefined): ConsentState {
+  if (ch === '1') return 'allowed';
+  if (ch === '0') return 'denied';
+  return 'unknown';
+}
+
+function parseGcdSourceMode(ch: string | undefined): { source: ConsentSource; mode: ConsentMode } {
+  switch (ch) {
+    case '1':
+      return { source: 'default', mode: 'basic' };
+    case '3':
+      return { source: 'default', mode: 'advanced' };
+    case '5':
+      return { source: 'update', mode: 'advanced' };
+    case '7':
+      return { source: 'update', mode: 'basic' };
+    default:
+      return { source: 'default', mode: 'unknown' };
+  }
+}
+
+function decodeGcd(input: string): DecodeResult {
+  const trimmed = input.trim();
+
+  // Normalise: remove dots if present
+  const normalised = trimmed.replace(/\./g, '');
+
+  const allDefs = [...SIGNAL_DEFS, ...EXTENDED_SIGNAL_DEFS];
+
+  const signals: SignalResult[] = [];
+  for (let i = 0; i < allDefs.length; i++) {
+    const charIdx = i * 2;
+    if (charIdx >= normalised.length) break;
+    const stateChar = normalised[charIdx];
+    const metaChar = normalised[charIdx + 1];
+    const state = parseGcdState(stateChar);
+    const { source, mode } = parseGcdSourceMode(metaChar);
+    const def = allDefs[i];
+    signals.push({
+      name: def.name,
+      displayName: def.displayName,
+      state,
+      source,
+      mode,
+      statusLabel: statusLabel(state, source),
+      implication: implicationText(def.name, state),
+    });
+  }
+
+  const knownCount = signals.filter((s) => s.state !== 'unknown').length;
+  const overallStatus: OverallStatus =
+    knownCount === 0 ? 'missing' : knownCount === signals.length ? 'active' : 'incomplete';
+
+  const overallSummary =
+    overallStatus === 'active'
+      ? 'Consent Mode is active — all signals are detected in this GCD parameter.'
+      : overallStatus === 'incomplete'
+        ? 'Consent Mode is partially configured — some signals could not be determined from this GCD value.'
+        : 'Consent Mode does not appear to be active based on this GCD value.';
+
+  return { inputType: 'gcd', overallStatus, overallSummary, signals, rawInput: trimmed };
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/** Detect input type by pattern matching and decode accordingly. */
+export function decode(input: string): DecodeResult {
+  const trimmed = input.trim();
+
+  if (GCS_PATTERN.test(trimmed)) {
+    return decodeGcs(trimmed);
+  }
+
+  if (GCD_PATTERN.test(trimmed) || GCD_DOT_PATTERN.test(trimmed)) {
+    return decodeGcd(trimmed);
+  }
+
+  // Unrecognised input
+  return {
+    inputType: 'unknown',
+    overallStatus: 'missing',
+    overallSummary:
+      "That doesn't look like a valid GCS or GCD code. Check the 'How to find this' tab for guidance on locating your code.",
+    signals: [],
+    rawInput: trimmed,
+  };
+}
+
+/** Convenience: detect whether input looks like GCS, GCD, or unknown. */
+export function detectInputType(input: string): 'gcs' | 'gcd' | 'unknown' {
+  const trimmed = input.trim();
+  if (GCS_PATTERN.test(trimmed)) return 'gcs';
+  if (GCD_PATTERN.test(trimmed) || GCD_DOT_PATTERN.test(trimmed)) return 'gcd';
+  return 'unknown';
+}
