@@ -1,5 +1,5 @@
 # Consent Mode Checker
-
+<img width="1750" height="1098" alt="image" src="https://github.com/user-attachments/assets/17485006-70dd-4f7e-ae91-742140a85ad2" />
 A web application that helps non-technical users understand and audit their Google Consent Mode v2 implementation by decoding `gcs` and `gcd` parameter values and presenting clear, jargon-free explanations.
 
 ## Features
