@@ -128,8 +128,10 @@ create or replace trigger on_auth_user_created
 4. **Site configuration → Environment variables** → Add:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   
-   Mark both as sensitive/secret in Netlify's UI.
+
+   These are **public client-side values** in a Vite app, so do **not** use your Supabase service-role key.
+   If Netlify secrets scanning flags these public values, prefer adding an allowlist in the Netlify UI for the
+   specific detected values (smart-detection omit values) rather than disabling scans for whole env var names in repo config.
 5. Trigger redeploy.
 
 ## Common Issues
