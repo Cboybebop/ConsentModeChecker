@@ -218,7 +218,7 @@ function AppRoutes() {
           </Alert>
         </div>
       )}
-      <main className="min-h-screen px-4">
+      <main className="px-4">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/quick-check" element={<QuickCheckPage />} />
