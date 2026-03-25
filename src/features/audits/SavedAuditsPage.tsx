@@ -98,8 +98,8 @@ export function SavedAuditsPage() {
 
   return (
     <div className="mx-auto max-w-3xl py-8">
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">Saved Audits</h1>
-      <p className="mb-6 text-gray-600">View and compare your past audit results.</p>
+      <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-100">Saved Audits</h1>
+      <p className="mb-6 text-gray-600 dark:text-gray-300">View and compare your past audit results.</p>
 
       {supabaseAudits.error && (
         <Alert variant="error" className="mb-4">{supabaseAudits.error}</Alert>
@@ -114,7 +114,7 @@ export function SavedAuditsPage() {
 
       <div className="mt-4 space-y-2">
         {filtered.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-500">
+          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             No audits yet. Run a Quick Check or Guided Audit to get started.
           </p>
         ) : (
