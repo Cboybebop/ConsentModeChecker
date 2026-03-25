@@ -101,7 +101,7 @@ export const HELP = {
       'In the Network tab filter box, type "collect" or "google".',
       'Click on any request to Google (e.g. google-analytics.com).',
       'Look in the URL or Payload tab for a parameter called "gcs" or "gcd".',
-      'Copy the value (e.g. "G100", "11x1x1x1x5", or "15n05n15n05") and paste it into the checker.',
+      'Copy the value (e.g. "G100", "11x1x1x1x5", "15n05n15n05", or "13n3n3n3n5l1") and paste it into the checker.',
     ],
   },
   faq: [

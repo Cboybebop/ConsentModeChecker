@@ -13,6 +13,8 @@ describe('detectInputType', () => {
     expect(detectInputType('15051505')).toBe('gcd');
     expect(detectInputType('1.5.0.5.1.5.0.5')).toBe('gcd');
     expect(detectInputType('15n05n15n05')).toBe('gcd');
+    expect(detectInputType('13n3n3n3n5l1')).toBe('gcd');
+    expect(detectInputType('13m3m3m3m5l1')).toBe('gcd');
   });
 
   it('returns unknown for invalid input', () => {
@@ -119,6 +121,20 @@ describe('decode GCD', () => {
     expect(result.signals[1].state).toBe('denied');
     expect(result.signals[2].state).toBe('allowed');
     expect(result.signals[3].state).toBe('denied');
+  });
+
+  it('decodes compact network-style GCD with n separators', () => {
+    const result = decode('13n3n3n3n5l1');
+    expect(result.inputType).toBe('gcd');
+    expect(result.signals).toHaveLength(4);
+    expect(result.signals.every((s) => s.state === 'denied')).toBe(true);
+  });
+
+  it('decodes compact network-style GCD with m separators', () => {
+    const result = decode('13m3m3m3m5l1');
+    expect(result.inputType).toBe('gcd');
+    expect(result.signals).toHaveLength(4);
+    expect(result.signals.every((s) => s.state === 'denied')).toBe(true);
   });
 });
 
