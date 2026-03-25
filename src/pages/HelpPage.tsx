@@ -4,27 +4,37 @@ import { HELP } from '../constants/text';
 export function HelpPage() {
   return (
     <div className="mx-auto max-w-3xl py-8">
-      <h1 className="mb-8 text-2xl font-bold text-gray-900">Help & FAQ</h1>
+      <h1 className="mb-8 text-2xl font-bold text-gray-900 dark:text-gray-100">Help & FAQ</h1>
 
       <div className="space-y-8">
         {/* What is Consent Mode */}
         <Card>
-          <h2 className="mb-2 text-lg font-semibold text-gray-900">{HELP.whatIsConsentMode.title}</h2>
-          <p className="text-sm text-gray-600 leading-relaxed">{HELP.whatIsConsentMode.body}</p>
+          <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {HELP.whatIsConsentMode.title}
+          </h2>
+          <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+            {HELP.whatIsConsentMode.body}
+          </p>
         </Card>
 
         {/* What are GCS/GCD */}
         <Card>
-          <h2 className="mb-2 text-lg font-semibold text-gray-900">{HELP.whatAreGcsGcd.title}</h2>
-          <p className="text-sm text-gray-600 leading-relaxed">{HELP.whatAreGcsGcd.body}</p>
+          <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {HELP.whatAreGcsGcd.title}
+          </h2>
+          <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+            {HELP.whatAreGcsGcd.body}
+          </p>
         </Card>
 
         {/* How to find codes */}
         <Card>
-          <h2 className="mb-3 text-lg font-semibold text-gray-900">{HELP.howToFind.title}</h2>
+          <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {HELP.howToFind.title}
+          </h2>
           <ol className="space-y-2">
             {HELP.howToFind.steps.map((step, i) => (
-              <li key={i} className="flex gap-3 text-sm text-gray-600">
+              <li key={i} className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700">
                   {i + 1}
                 </span>
@@ -36,12 +46,16 @@ export function HelpPage() {
 
         {/* FAQ */}
         <div>
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Frequently Asked Questions</h2>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Frequently Asked Questions
+          </h2>
           <div className="space-y-4">
             {HELP.faq.map((item, i) => (
               <Card key={i}>
-                <h3 className="mb-1 text-sm font-semibold text-gray-900">{item.q}</h3>
-                <p className="text-sm text-gray-600">{item.a}</p>
+                <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {item.q}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{item.a}</p>
               </Card>
             ))}
           </div>

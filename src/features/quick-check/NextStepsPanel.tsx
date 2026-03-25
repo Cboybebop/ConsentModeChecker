@@ -32,7 +32,9 @@ function generateRecommendations(signals: SignalResult[]): string[] {
   }
 
   if (recs.length === 0) {
-    recs.push('No immediate issues found. Consider running a full Guided Audit for a complete check.');
+    recs.push(
+      'No immediate issues found. Consider running a full Guided Audit for a complete check.',
+    );
   }
 
   return recs;
@@ -42,12 +44,17 @@ export function NextStepsPanel({ signals }: NextStepsPanelProps) {
   const recommendations = generateRecommendations(signals);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-gray-900">Recommended next steps</h3>
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/70">
+      <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
+        Recommended next steps
+      </h3>
       <ul className="space-y-2">
         {recommendations.map((rec, i) => (
-          <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-primary-600" aria-hidden="true" />
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <span
+              className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-primary-600"
+              aria-hidden="true"
+            />
             {rec}
           </li>
         ))}

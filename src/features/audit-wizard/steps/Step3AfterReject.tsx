@@ -12,7 +12,10 @@ interface Step3Props {
 }
 
 export function Step3AfterReject({
-  rejectInput, setRejectInput, setRejectResult, acceptResult,
+  rejectInput,
+  setRejectInput,
+  setRejectResult,
+  acceptResult,
 }: Step3Props) {
   const [result, setResult] = useState<DecodeResult | null>(null);
 
@@ -33,8 +36,10 @@ export function Step3AfterReject({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">{WIZARD.step3Title}</h2>
-        <p className="text-sm text-gray-600">{WIZARD.step3Description}</p>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {WIZARD.step3Title}
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300">{WIZARD.step3Description}</p>
       </div>
 
       <textarea

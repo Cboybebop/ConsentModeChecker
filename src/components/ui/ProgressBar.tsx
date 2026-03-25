@@ -9,11 +9,13 @@ export function ProgressBar({ current, total, className = '' }: ProgressBarProps
 
   return (
     <div className={className}>
-      <div className="mb-1 flex justify-between text-xs text-gray-500">
-        <span>Step {current} of {total}</span>
+      <div className="mb-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
+        <span>
+          Step {current} of {total}
+        </span>
         <span>{pct}%</span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
         <div
           className="h-full rounded-full bg-primary-600 transition-all duration-300"
           style={{ width: `${pct}%` }}

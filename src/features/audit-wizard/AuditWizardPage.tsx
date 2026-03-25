@@ -87,15 +87,23 @@ export function AuditWizardPage() {
 
   return (
     <div className="mx-auto max-w-3xl py-8">
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">Guided Audit</h1>
-      <p className="mb-6 text-gray-600">
+      <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-100">Guided Audit</h1>
+      <p className="mb-6 text-gray-600 dark:text-gray-300">
         Walk through a 4-step audit to get a full compliance report for your site.
       </p>
 
       <ProgressBar current={step} total={TOTAL_STEPS} className="mb-8" />
 
-      {saveError && <Alert variant="error" className="mb-4">{saveError}</Alert>}
-      {saved && <Alert variant="success" className="mb-4">Audit saved successfully.</Alert>}
+      {saveError && (
+        <Alert variant="error" className="mb-4">
+          {saveError}
+        </Alert>
+      )}
+      {saved && (
+        <Alert variant="success" className="mb-4">
+          Audit saved successfully.
+        </Alert>
+      )}
 
       {step === 1 && (
         <Step1SiteDetails

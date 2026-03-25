@@ -30,8 +30,10 @@ export function Step2AfterAccept({ acceptInput, setAcceptInput, setAcceptResult 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">{WIZARD.step2Title}</h2>
-        <p className="text-sm text-gray-600">{WIZARD.step2Description}</p>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {WIZARD.step2Title}
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300">{WIZARD.step2Description}</p>
       </div>
 
       <textarea
@@ -42,9 +44,7 @@ export function Step2AfterAccept({ acceptInput, setAcceptInput, setAcceptResult 
         className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
       />
 
-      {result && result.inputType !== 'unknown' && (
-        <ConsentGrid signals={result.signals} />
-      )}
+      {result && result.inputType !== 'unknown' && <ConsentGrid signals={result.signals} />}
     </div>
   );
 }

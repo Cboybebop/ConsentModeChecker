@@ -10,17 +10,27 @@ interface Step1Props {
 }
 
 export function Step1SiteDetails({
-  siteUrl, setSiteUrl, siteName, setSiteName, bannerChoice, setBannerChoice,
+  siteUrl,
+  setSiteUrl,
+  siteName,
+  setSiteName,
+  bannerChoice,
+  setBannerChoice,
 }: Step1Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">{WIZARD.step1Title}</h2>
-        <p className="text-sm text-gray-600">{WIZARD.step1Description}</p>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {WIZARD.step1Title}
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300">{WIZARD.step1Description}</p>
       </div>
 
       <div>
-        <label htmlFor="site-url" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="site-url"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           Site URL <span className="text-red-500">*</span>
         </label>
         <input
@@ -35,7 +45,10 @@ export function Step1SiteDetails({
       </div>
 
       <div>
-        <label htmlFor="site-name" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="site-name"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           Site name (optional)
         </label>
         <input
@@ -49,14 +62,19 @@ export function Step1SiteDetails({
       </div>
 
       <div>
-        <p className="mb-3 text-sm font-medium text-gray-700">{WIZARD.bannerQuestion}</p>
+        <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+          {WIZARD.bannerQuestion}
+        </p>
         <div className="space-y-2">
-          {([
+          {[
             { value: 'yes' as const, label: WIZARD.bannerYes },
             { value: 'no' as const, label: WIZARD.bannerNo },
             { value: 'unsure' as const, label: WIZARD.bannerNotSure },
-          ]).map((opt) => (
-            <label key={opt.value} className="flex items-start gap-3 rounded-md border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+          ].map((opt) => (
+            <label
+              key={opt.value}
+              className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:bg-gray-800/70"
+            >
               <input
                 type="radio"
                 name="banner-choice"
@@ -65,7 +83,7 @@ export function Step1SiteDetails({
                 onChange={() => setBannerChoice(opt.value)}
                 className="mt-0.5"
               />
-              <span className="text-sm text-gray-700">{opt.label}</span>
+              <span className="text-sm text-gray-700 dark:text-gray-200">{opt.label}</span>
             </label>
           ))}
         </div>

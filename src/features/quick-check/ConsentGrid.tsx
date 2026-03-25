@@ -17,14 +17,18 @@ export function ConsentGrid({ signals }: ConsentGridProps) {
         <Card key={signal.name}>
           <div className="mb-2 flex items-center justify-between">
             <Tooltip content={TOOLTIPS[signal.name] ?? ''}>
-              <span className="font-medium text-gray-900">{signal.displayName}</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">
+                {signal.displayName}
+              </span>
             </Tooltip>
             <Badge variant={consentBadgeVariant(signal.state)}>
               {BADGE_LABELS[signal.state] ?? 'Unknown'}
             </Badge>
           </div>
-          <p className="mb-1 text-sm font-medium text-gray-700">{signal.statusLabel}</p>
-          <p className="text-sm text-gray-500">{signal.implication}</p>
+          <p className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+            {signal.statusLabel}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-300">{signal.implication}</p>
         </Card>
       ))}
     </div>
