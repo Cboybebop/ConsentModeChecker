@@ -64,7 +64,6 @@ npm test
 -- 1. Tables
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  email text,
   created_at timestamptz default now()
 );
 
@@ -103,8 +102,8 @@ create policy "Users manage own profile"
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email);
+  insert into public.profiles (id)
+  values (new.id);
   return new;
 end;
 $$ language plpgsql security definer;
