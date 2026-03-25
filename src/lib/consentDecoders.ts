@@ -199,8 +199,19 @@ function decodeGcs(input: string): DecodeResult {
 //   Pair 5 (chars 10-11): functionality_storage (if present)
 //   Pair 6 (chars 12-13): security_storage (if present)
 
-const GCD_PATTERN = /^[01x\-][1357x\-]([01x\-][1357x\-]){1,6}$/i;
-const GCD_DOT_PATTERN = /^[01x\-]\.[1357x\-](\.[01x\-]\.[1357x\-]){1,6}$/i;
+const GCD_STATE_CHAR = '[01x\\-]';
+const GCD_META_CHAR = '[1357x\\-]';
+const GCD_PAIR_PATTERN = `${GCD_STATE_CHAR}${GCD_META_CHAR}`;
+const GCD_DELIMITER_PATTERN = '[.n]';
+const GCD_PATTERN = new RegExp(`^${GCD_PAIR_PATTERN}(${GCD_PAIR_PATTERN}){1,6}$`, 'i');
+const GCD_DELIMITED_PATTERN = new RegExp(
+  `^${GCD_PAIR_PATTERN}(${GCD_DELIMITER_PATTERN}${GCD_PAIR_PATTERN}){1,6}$`,
+  'i',
+);
+const GCD_CHAR_DELIMITED_PATTERN = new RegExp(
+  `^${GCD_STATE_CHAR}${GCD_DELIMITER_PATTERN}${GCD_META_CHAR}(${GCD_DELIMITER_PATTERN}${GCD_STATE_CHAR}${GCD_DELIMITER_PATTERN}${GCD_META_CHAR}){1,6}$`,
+  'i',
+);
 
 function parseGcdState(ch: string | undefined): ConsentState {
   if (ch === '1') return 'allowed';
@@ -226,8 +237,20 @@ function parseGcdSourceMode(ch: string | undefined): { source: ConsentSource; mo
 function decodeGcd(input: string): DecodeResult {
   const trimmed = input.trim();
 
-  // Normalise: remove dots if present
-  const normalised = trimmed.replace(/\./g, '');
+  // Normalise: remove accepted delimiters before parsing positional pairs
+  const normalised = trimmed.replace(/[.n]/gi, '');
+
+  // Defensive validation after normalisation — only strict state/meta pairs are allowed.
+  if (!GCD_PATTERN.test(normalised)) {
+    return {
+      inputType: 'unknown',
+      overallStatus: 'missing',
+      overallSummary:
+        "That doesn't look like a valid GCS or GCD code. Check the 'How to find this' tab for guidance on locating your code.",
+      signals: [],
+      rawInput: trimmed,
+    };
+  }
 
   const allDefs = [...SIGNAL_DEFS, ...EXTENDED_SIGNAL_DEFS];
 
@@ -277,7 +300,11 @@ export function decode(input: string): DecodeResult {
     return decodeGcs(trimmed);
   }
 
-  if (GCD_PATTERN.test(trimmed) || GCD_DOT_PATTERN.test(trimmed)) {
+  if (
+    GCD_PATTERN.test(trimmed) ||
+    GCD_DELIMITED_PATTERN.test(trimmed) ||
+    GCD_CHAR_DELIMITED_PATTERN.test(trimmed)
+  ) {
     return decodeGcd(trimmed);
   }
 
@@ -296,6 +323,12 @@ export function decode(input: string): DecodeResult {
 export function detectInputType(input: string): 'gcs' | 'gcd' | 'unknown' {
   const trimmed = input.trim();
   if (GCS_PATTERN.test(trimmed)) return 'gcs';
-  if (GCD_PATTERN.test(trimmed) || GCD_DOT_PATTERN.test(trimmed)) return 'gcd';
+  if (
+    GCD_PATTERN.test(trimmed) ||
+    GCD_DELIMITED_PATTERN.test(trimmed) ||
+    GCD_CHAR_DELIMITED_PATTERN.test(trimmed)
+  ) {
+    return 'gcd';
+  }
   return 'unknown';
 }
