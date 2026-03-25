@@ -11,6 +11,8 @@ describe('detectInputType', () => {
   it('detects GCD pattern', () => {
     expect(detectInputType('1105')).toBe('gcd');
     expect(detectInputType('15051505')).toBe('gcd');
+    expect(detectInputType('1.5.0.5.1.5.0.5')).toBe('gcd');
+    expect(detectInputType('15n05n15n05')).toBe('gcd');
   });
 
   it('returns unknown for invalid input', () => {
@@ -100,6 +102,24 @@ describe('decode GCD', () => {
     expect(result.signals[0].state).toBe('allowed');
     expect(result.signals[1].state).toBe('denied');
   });
+
+  it('decodes dot-delimited GCD (regression)', () => {
+    const result = decode('1.5.0.5.1.5.0.5');
+    expect(result.inputType).toBe('gcd');
+    expect(result.signals).toHaveLength(4);
+    expect(result.signals[0].state).toBe('allowed');
+    expect(result.signals[1].state).toBe('denied');
+  });
+
+  it('decodes n-delimited GCD from network traffic', () => {
+    const result = decode('15n05n15n05');
+    expect(result.inputType).toBe('gcd');
+    expect(result.signals).toHaveLength(4);
+    expect(result.signals[0].state).toBe('allowed');
+    expect(result.signals[1].state).toBe('denied');
+    expect(result.signals[2].state).toBe('allowed');
+    expect(result.signals[3].state).toBe('denied');
+  });
 });
 
 describe('decode — invalid input', () => {
@@ -119,5 +139,12 @@ describe('decode — invalid input', () => {
   it('has a user-friendly summary for unknown input', () => {
     const result = decode('xyz');
     expect(result.overallSummary).toContain("doesn't look like a valid");
+  });
+
+  it('rejects malformed n-delimited GCD variants', () => {
+    expect(detectInputType('13n3n3n3n51')).toBe('unknown');
+    expect(decode('13n3n3n3n51').inputType).toBe('unknown');
+    expect(detectInputType('15nn05')).toBe('unknown');
+    expect(detectInputType('15n0z')).toBe('unknown');
   });
 });
