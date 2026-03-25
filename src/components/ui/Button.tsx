@@ -12,10 +12,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
+    'bg-primary-600 text-white hover:bg-primary-500 focus:ring-primary-500 focus:ring-offset-white dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-950',
   secondary:
-    'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-primary-500',
-  ghost: 'bg-transparent text-gray-600 hover:bg-gray-100 focus:ring-gray-400',
+    'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-primary-500 focus:ring-offset-white dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:focus:ring-offset-gray-950',
+  ghost:
+    'bg-transparent text-gray-600 hover:bg-gray-100 focus:ring-gray-400 focus:ring-offset-white dark:text-gray-300 dark:hover:bg-gray-800 dark:focus:ring-offset-gray-950',
   danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
 };
 
@@ -47,8 +48,19 @@ export function Button({
           fill="none"
           aria-hidden="true"
         >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
         </svg>
       )}
       {children}

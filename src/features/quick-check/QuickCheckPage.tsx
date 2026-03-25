@@ -120,8 +120,8 @@ export function QuickCheckPage() {
 
   return (
     <div className="mx-auto max-w-3xl py-8">
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">Quick Check</h1>
-      <p className="mb-6 text-gray-600">
+      <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-100">Quick Check</h1>
+      <p className="mb-6 text-gray-600 dark:text-gray-300">
         Paste a single GCS or GCD value to instantly see your Consent Mode status.
       </p>
 
@@ -154,7 +154,10 @@ export function QuickCheckPage() {
         <div className="space-y-4">
           {saveError && <Alert variant="error">{saveError}</Alert>}
           <div>
-            <label htmlFor="save-site-name" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="save-site-name"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               Site name (optional)
             </label>
             <input
@@ -166,7 +169,10 @@ export function QuickCheckPage() {
             />
           </div>
           <div>
-            <label htmlFor="save-site-url" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="save-site-url"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               Site URL
             </label>
             <input

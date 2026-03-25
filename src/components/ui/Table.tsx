@@ -15,32 +15,43 @@ interface TableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
-export function Table<T>({ columns, data, keyExtractor, className = '', onRowClick }: TableProps<T>) {
+export function Table<T>({
+  columns,
+  data,
+  keyExtractor,
+  className = '',
+  onRowClick,
+}: TableProps<T>) {
   return (
     <div className={`overflow-x-auto ${className}`}>
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead className="bg-gray-50 dark:bg-gray-900">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 scope="col"
-                className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 ${col.className ?? ''}`}
+                className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 ${col.className ?? ''}`}
               >
                 {col.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
+        <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900/70">
           {data.map((row) => (
             <tr
               key={keyExtractor(row)}
-              className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+              className={
+                onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/70' : ''
+              }
               onClick={() => onRowClick?.(row)}
             >
               {columns.map((col) => (
-                <td key={col.key} className={`px-4 py-3 text-sm text-gray-700 ${col.className ?? ''}`}>
+                <td
+                  key={col.key}
+                  className={`px-4 py-3 text-sm text-gray-700 dark:text-gray-200 ${col.className ?? ''}`}
+                >
                   {col.render(row)}
                 </td>
               ))}
@@ -48,7 +59,10 @@ export function Table<T>({ columns, data, keyExtractor, className = '', onRowCli
           ))}
           {data.length === 0 && (
             <tr>
-              <td colSpan={columns.length} className="px-4 py-8 text-center text-sm text-gray-500">
+              <td
+                colSpan={columns.length}
+                className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+              >
                 No data to display.
               </td>
             </tr>
