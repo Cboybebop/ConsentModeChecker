@@ -25,13 +25,13 @@ function gaugeLabel(v: number): string {
 
 export function QualityGauge({ value }: QualityGaugeProps) {
   return (
-    <div className="flex flex-col items-center rounded-lg border border-gray-200 bg-white p-6">
+    <div className="flex flex-col items-center rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900/70">
       <Tooltip content={TOOLTIPS.quality_index}>
-        <span className="mb-1 text-sm font-medium text-gray-500">Quality Index</span>
+        <span className="mb-1 text-sm font-medium text-gray-500 dark:text-gray-300">Quality Index</span>
       </Tooltip>
       <span className={`text-5xl font-bold ${gaugeColor(value)}`}>{value}</span>
-      <span className="mt-1 text-sm text-gray-500">{gaugeLabel(value)}</span>
-      <div className="mt-4 h-2 w-full max-w-xs overflow-hidden rounded-full bg-gray-200">
+      <span className="mt-1 text-sm text-gray-500 dark:text-gray-300">{gaugeLabel(value)}</span>
+      <div className="mt-4 h-2 w-full max-w-xs overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
         <div
           className={`h-full rounded-full transition-all duration-500 ${gaugeBg(value)}`}
           style={{ width: `${value}%` }}
