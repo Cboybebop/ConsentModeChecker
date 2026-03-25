@@ -4,17 +4,14 @@ export interface Database {
       profiles: {
         Row: {
           id: string;
-          email: string | null;
           created_at: string;
         };
         Insert: {
           id: string;
-          email?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
-          email?: string | null;
           created_at?: string;
         };
       };
