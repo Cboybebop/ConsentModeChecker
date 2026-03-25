@@ -199,8 +199,19 @@ function decodeGcs(input: string): DecodeResult {
 //   Pair 5 (chars 10-11): functionality_storage (if present)
 //   Pair 6 (chars 12-13): security_storage (if present)
 
-const GCD_PATTERN = /^[01x\-][1357x\-]([01x\-][1357x\-]){1,6}$/i;
-const GCD_DOT_PATTERN = /^[01x\-]\.[1357x\-](\.[01x\-]\.[1357x\-]){1,6}$/i;
+const GCD_STATE_CHAR = '[01x\\-]';
+const GCD_META_CHAR = '[1357x\\-]';
+const GCD_PAIR_PATTERN = `${GCD_STATE_CHAR}${GCD_META_CHAR}`;
+const GCD_DELIMITER_PATTERN = '[.n]';
+const GCD_PATTERN = new RegExp(`^${GCD_PAIR_PATTERN}(${GCD_PAIR_PATTERN}){1,6}$`, 'i');
+const GCD_DELIMITED_PATTERN = new RegExp(
+  `^${GCD_PAIR_PATTERN}(${GCD_DELIMITER_PATTERN}${GCD_PAIR_PATTERN}){1,6}$`,
+  'i',
+);
+const GCD_CHAR_DELIMITED_PATTERN = new RegExp(
+  `^${GCD_STATE_CHAR}${GCD_DELIMITER_PATTERN}${GCD_META_CHAR}(${GCD_DELIMITER_PATTERN}${GCD_STATE_CHAR}${GCD_DELIMITER_PATTERN}${GCD_META_CHAR}){1,6}$`,
+  'i',
+);
 
 function parseGcdState(ch: string | undefined): ConsentState {
   if (ch === '1') return 'allowed';
@@ -223,11 +234,96 @@ function parseGcdSourceMode(ch: string | undefined): { source: ConsentSource; mo
   }
 }
 
+function parseCompactGcdCode(ch: string | undefined): {
+  state: ConsentState;
+  source: ConsentSource;
+  mode: ConsentMode;
+} {
+  if (!ch) return { state: 'unknown', source: 'default', mode: 'unknown' };
+
+  // Letter-based compact codes seen in network traffic.
+  if (/[trnuv]/i.test(ch)) return { state: 'allowed', source: 'default', mode: 'unknown' };
+  if (/[pqm]/i.test(ch)) return { state: 'denied', source: 'default', mode: 'unknown' };
+  if (/[lx\-]/i.test(ch)) return { state: 'unknown', source: 'default', mode: 'unknown' };
+
+  // Numeric compact codes: preserve source/mode when possible.
+  if (/[1357]/.test(ch)) {
+    const { source, mode } = parseGcdSourceMode(ch);
+    return { state: 'denied', source, mode };
+  }
+  if (ch === '0') return { state: 'denied', source: 'default', mode: 'unknown' };
+  if (ch === '1') return { state: 'allowed', source: 'default', mode: 'basic' };
+
+  return { state: 'unknown', source: 'default', mode: 'unknown' };
+}
+
+function decodeNetworkStyleGcd(input: string): DecodeResult | null {
+  const trimmed = input.trim();
+  if (!trimmed.toLowerCase().startsWith('1')) return null;
+
+  // Parse shape: 1<code><sep><code><sep>... where sep is often a letter (e.g. n/m/l).
+  const codes: string[] = [];
+  let i = 1;
+  while (i < trimmed.length) {
+    const code = trimmed[i];
+    codes.push(code);
+    i += 1;
+    if (i >= trimmed.length) break;
+    const sep = trimmed[i];
+    if (!/[a-z]/i.test(sep)) return null;
+    i += 1;
+  }
+
+  const endIdx = codes.findIndex((c) => c === '5');
+  if (endIdx < 4) return null;
+
+  const signalCodes = codes.slice(0, endIdx).slice(0, SIGNAL_DEFS.length + EXTENDED_SIGNAL_DEFS.length);
+  const allDefs = [...SIGNAL_DEFS, ...EXTENDED_SIGNAL_DEFS];
+
+  const signals: SignalResult[] = signalCodes.map((code, idx) => {
+    const { state, source, mode } = parseCompactGcdCode(code);
+    const def = allDefs[idx];
+    return {
+      name: def.name,
+      displayName: def.displayName,
+      state,
+      source,
+      mode,
+      statusLabel: statusLabel(state, source),
+      implication: implicationText(def.name, state),
+    };
+  });
+
+  const knownCount = signals.filter((s) => s.state !== 'unknown').length;
+  const overallStatus: OverallStatus =
+    knownCount === 0 ? 'missing' : knownCount === signals.length ? 'active' : 'incomplete';
+  const overallSummary =
+    overallStatus === 'active'
+      ? 'Consent Mode is active — all signals are detected in this GCD parameter.'
+      : overallStatus === 'incomplete'
+        ? 'Consent Mode is partially configured — some signals could not be determined from this GCD value.'
+        : 'Consent Mode does not appear to be active based on this GCD value.';
+
+  return { inputType: 'gcd', overallStatus, overallSummary, signals, rawInput: trimmed };
+}
+
 function decodeGcd(input: string): DecodeResult {
   const trimmed = input.trim();
 
-  // Normalise: remove dots if present
-  const normalised = trimmed.replace(/\./g, '');
+  // Normalise: remove accepted delimiters before parsing positional pairs
+  const normalised = trimmed.replace(/[.n]/gi, '');
+
+  // Defensive validation after normalisation — only strict state/meta pairs are allowed.
+  if (!GCD_PATTERN.test(normalised)) {
+    return {
+      inputType: 'unknown',
+      overallStatus: 'missing',
+      overallSummary:
+        "That doesn't look like a valid GCS or GCD code. Check the 'How to find this' tab for guidance on locating your code.",
+      signals: [],
+      rawInput: trimmed,
+    };
+  }
 
   const allDefs = [...SIGNAL_DEFS, ...EXTENDED_SIGNAL_DEFS];
 
@@ -277,9 +373,16 @@ export function decode(input: string): DecodeResult {
     return decodeGcs(trimmed);
   }
 
-  if (GCD_PATTERN.test(trimmed) || GCD_DOT_PATTERN.test(trimmed)) {
+  if (
+    GCD_PATTERN.test(trimmed) ||
+    GCD_DELIMITED_PATTERN.test(trimmed) ||
+    GCD_CHAR_DELIMITED_PATTERN.test(trimmed)
+  ) {
     return decodeGcd(trimmed);
   }
+
+  const networkStyleGcd = decodeNetworkStyleGcd(trimmed);
+  if (networkStyleGcd) return networkStyleGcd;
 
   // Unrecognised input
   return {
@@ -296,6 +399,13 @@ export function decode(input: string): DecodeResult {
 export function detectInputType(input: string): 'gcs' | 'gcd' | 'unknown' {
   const trimmed = input.trim();
   if (GCS_PATTERN.test(trimmed)) return 'gcs';
-  if (GCD_PATTERN.test(trimmed) || GCD_DOT_PATTERN.test(trimmed)) return 'gcd';
+  if (
+    GCD_PATTERN.test(trimmed) ||
+    GCD_DELIMITED_PATTERN.test(trimmed) ||
+    GCD_CHAR_DELIMITED_PATTERN.test(trimmed)
+  ) {
+    return 'gcd';
+  }
+  if (decodeNetworkStyleGcd(trimmed)) return 'gcd';
   return 'unknown';
 }
