@@ -136,6 +136,19 @@ export const HELP = {
   ],
 };
 
+export const GCD_METADATA = {
+  globalPrivacyTitle: 'Global Privacy Controls',
+  containerScopedTitle: 'Container Scoped Defaults',
+  usPrivacyLawsOptedIn: 'US Privacy Laws Opted In',
+  usedContainerDefaults: 'Used Container Defaults',
+  adPersonalizationSignals: 'Ad Personalization Signals',
+  adStorage: 'Ad Storage',
+  analyticsStorage: 'Analytics Storage',
+  adUserData: 'Ad User Data',
+  adPersonalization: 'Ad Personalization',
+  usedContainerScopedDefaults: 'UsedContainerScopedDefaults',
+};
+
 export const TOOLTIPS: Record<string, string> = {
   gcs: 'GCS (Google Consent State) is a short code in Google network requests that shows the current consent settings for each storage type.',
   gcd: 'GCD (Google Consent Default) encodes the default and updated consent states, including whether the site uses basic or advanced Consent Mode.',

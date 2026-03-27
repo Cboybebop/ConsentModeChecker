@@ -3,6 +3,8 @@ import type { ScoreResult } from '../../../lib/scoring';
 import { scoreAudit } from '../../../lib/scoring';
 import { ScorecardTable } from '../ScorecardTable';
 import { QualityGauge } from '../QualityGauge';
+import { GlobalPrivacyPanel } from '../../quick-check/GlobalPrivacyPanel';
+import { ContainerScopedDefaultsPanel } from '../../quick-check/ContainerScopedDefaultsPanel';
 import { Button } from '../../../components/ui/Button';
 import { WIZARD } from '../../../constants/text';
 
@@ -48,6 +50,17 @@ export function Step4Summary({
 
       <QualityGauge value={result.qualityIndex} />
       <ScorecardTable rows={result.scorecard} />
+
+      {(acceptResult?.globalPrivacyControls || rejectResult?.globalPrivacyControls) && (
+        <GlobalPrivacyPanel
+          data={(acceptResult?.globalPrivacyControls ?? rejectResult?.globalPrivacyControls)!}
+        />
+      )}
+      {(acceptResult?.containerScopedDefaults || rejectResult?.containerScopedDefaults) && (
+        <ContainerScopedDefaultsPanel
+          data={(acceptResult?.containerScopedDefaults ?? rejectResult?.containerScopedDefaults)!}
+        />
+      )}
 
       {result.recommendations.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/70">

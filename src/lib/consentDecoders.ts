@@ -4,6 +4,7 @@ export type ConsentState = 'allowed' | 'denied' | 'unknown';
 export type ConsentSource = 'default' | 'update';
 export type ConsentMode = 'basic' | 'advanced' | 'unknown';
 export type OverallStatus = 'active' | 'incomplete' | 'missing';
+export type TriState = 'yes' | 'no' | 'na';
 
 export interface SignalResult {
   name: string;
@@ -15,12 +16,28 @@ export interface SignalResult {
   implication: string;
 }
 
+export interface GlobalPrivacyControls {
+  usPrivacyLawsOptedIn: TriState;
+  usedContainerDefaults: TriState;
+  adPersonalizationSignals: TriState;
+}
+
+export interface ContainerScopedDefaults {
+  adStorage: boolean | null;
+  analyticsStorage: boolean | null;
+  adUserData: boolean | null;
+  adPersonalization: boolean | null;
+  usedContainerScopedDefaults: boolean | null;
+}
+
 export interface DecodeResult {
   inputType: 'gcs' | 'gcd' | 'unknown';
   overallStatus: OverallStatus;
   overallSummary: string;
   signals: SignalResult[];
   rawInput: string;
+  globalPrivacyControls?: GlobalPrivacyControls;
+  containerScopedDefaults?: ContainerScopedDefaults;
 }
 
 // ---------------------------------------------------------------------------
@@ -203,9 +220,11 @@ const GCD_STATE_CHAR = '[01x\\-]';
 const GCD_META_CHAR = '[1357x\\-]';
 const GCD_PAIR_PATTERN = `${GCD_STATE_CHAR}${GCD_META_CHAR}`;
 const GCD_DELIMITER_PATTERN = '[.n]';
-const GCD_PATTERN = new RegExp(`^${GCD_PAIR_PATTERN}(${GCD_PAIR_PATTERN}){1,6}$`, 'i');
+// Optional trailing metadata: up to 8 digits [01] after signal pairs
+const GCD_TRAILING_META = '[01]{0,8}';
+const GCD_PATTERN = new RegExp(`^${GCD_PAIR_PATTERN}(${GCD_PAIR_PATTERN}){1,6}${GCD_TRAILING_META}$`, 'i');
 const GCD_DELIMITED_PATTERN = new RegExp(
-  `^${GCD_PAIR_PATTERN}(${GCD_DELIMITER_PATTERN}${GCD_PAIR_PATTERN}){1,6}$`,
+  `^${GCD_PAIR_PATTERN}(${GCD_DELIMITER_PATTERN}${GCD_PAIR_PATTERN}){1,6}(${GCD_DELIMITER_PATTERN}${GCD_TRAILING_META})?$`,
   'i',
 );
 const GCD_CHAR_DELIMITED_PATTERN = new RegExp(
@@ -257,6 +276,58 @@ function parseCompactGcdCode(ch: string | undefined): {
   return { state: 'unknown', source: 'default', mode: 'unknown' };
 }
 
+// ---------------------------------------------------------------------------
+// GCD metadata parsing (trailing characters after consent signal pairs)
+// ---------------------------------------------------------------------------
+// After the consent signal pairs, the GCD parameter may encode additional
+// metadata about privacy controls and container-scoped defaults.
+//
+// Positional mapping for trailing metadata characters:
+//   Position 0: US Privacy Laws opted in (1=yes, 0=no, else N/A)
+//   Position 1: Used Container Defaults (1=yes, 0=no, else N/A)
+//   Position 2: Ad Personalization Signals (1=yes, 0=no, else N/A)
+//   Position 3: Container-scoped default for ad_storage (1=true, 0=false)
+//   Position 4: Container-scoped default for analytics_storage (1=true, 0=false)
+//   Position 5: Container-scoped default for ad_user_data (1=true, 0=false)
+//   Position 6: Container-scoped default for ad_personalization (1=true, 0=false)
+//   Position 7: UsedContainerScopedDefaults flag (1=true, 0=false)
+
+interface GcdMetadata {
+  globalPrivacyControls: GlobalPrivacyControls;
+  containerScopedDefaults: ContainerScopedDefaults;
+}
+
+function parseTriState(ch: string | undefined): TriState {
+  if (ch === '1') return 'yes';
+  if (ch === '0') return 'no';
+  return 'na';
+}
+
+function parseBoolFlag(ch: string | undefined): boolean | null {
+  if (ch === '1') return true;
+  if (ch === '0') return false;
+  return null;
+}
+
+function parseGcdMetadata(metaChars: string[]): GcdMetadata | null {
+  if (metaChars.length === 0) return null;
+
+  return {
+    globalPrivacyControls: {
+      usPrivacyLawsOptedIn: parseTriState(metaChars[0]),
+      usedContainerDefaults: parseTriState(metaChars[1]),
+      adPersonalizationSignals: parseTriState(metaChars[2]),
+    },
+    containerScopedDefaults: {
+      adStorage: parseBoolFlag(metaChars[3]),
+      analyticsStorage: parseBoolFlag(metaChars[4]),
+      adUserData: parseBoolFlag(metaChars[5]),
+      adPersonalization: parseBoolFlag(metaChars[6]),
+      usedContainerScopedDefaults: parseBoolFlag(metaChars[7]),
+    },
+  };
+}
+
 function decodeNetworkStyleGcd(input: string): DecodeResult | null {
   const trimmed = input.trim();
   if (!trimmed.toLowerCase().startsWith('1')) return null;
@@ -278,6 +349,7 @@ function decodeNetworkStyleGcd(input: string): DecodeResult | null {
   if (endIdx < 4) return null;
 
   const signalCodes = codes.slice(0, endIdx).slice(0, SIGNAL_DEFS.length + EXTENDED_SIGNAL_DEFS.length);
+  const metaCodes = codes.slice(endIdx + 1);
   const allDefs = [...SIGNAL_DEFS, ...EXTENDED_SIGNAL_DEFS];
 
   const signals: SignalResult[] = signalCodes.map((code, idx) => {
@@ -304,7 +376,18 @@ function decodeNetworkStyleGcd(input: string): DecodeResult | null {
         ? 'Consent Mode is partially configured — some signals could not be determined from this GCD value.'
         : 'Consent Mode does not appear to be active based on this GCD value.';
 
-  return { inputType: 'gcd', overallStatus, overallSummary, signals, rawInput: trimmed };
+  const metadata = parseGcdMetadata(metaCodes);
+  return {
+    inputType: 'gcd',
+    overallStatus,
+    overallSummary,
+    signals,
+    rawInput: trimmed,
+    ...(metadata && {
+      globalPrivacyControls: metadata.globalPrivacyControls,
+      containerScopedDefaults: metadata.containerScopedDefaults,
+    }),
+  };
 }
 
 function decodeGcd(input: string): DecodeResult {
@@ -347,6 +430,11 @@ function decodeGcd(input: string): DecodeResult {
     });
   }
 
+  // Extract trailing metadata characters beyond signal pairs
+  const signalCharsUsed = signals.length * 2;
+  const trailingChars = normalised.slice(signalCharsUsed).split('');
+  const metadata = parseGcdMetadata(trailingChars);
+
   const knownCount = signals.filter((s) => s.state !== 'unknown').length;
   const overallStatus: OverallStatus =
     knownCount === 0 ? 'missing' : knownCount === signals.length ? 'active' : 'incomplete';
@@ -358,7 +446,17 @@ function decodeGcd(input: string): DecodeResult {
         ? 'Consent Mode is partially configured — some signals could not be determined from this GCD value.'
         : 'Consent Mode does not appear to be active based on this GCD value.';
 
-  return { inputType: 'gcd', overallStatus, overallSummary, signals, rawInput: trimmed };
+  return {
+    inputType: 'gcd',
+    overallStatus,
+    overallSummary,
+    signals,
+    rawInput: trimmed,
+    ...(metadata && {
+      globalPrivacyControls: metadata.globalPrivacyControls,
+      containerScopedDefaults: metadata.containerScopedDefaults,
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------

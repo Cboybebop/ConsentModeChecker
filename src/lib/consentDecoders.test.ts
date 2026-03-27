@@ -138,6 +138,72 @@ describe('decode GCD', () => {
   });
 });
 
+describe('decode GCD metadata', () => {
+  it('parses metadata from network-style GCD with trailing characters', () => {
+    // 13n3n3n3n5l1p0p1p1p1p1p0 — after the '5' marker:
+    // codes after 5: ['1', '0', '1', '1', '1', '1', '0']
+    // pos0=1 (US privacy: yes), pos1=0 (container defaults: no), pos2=1 (ad personalization: yes)
+    // pos3=1 (ad_storage: true), pos4=1 (analytics_storage: true),
+    // pos5=1 (ad_user_data: true), pos6=0 (ad_personalization: false)
+    const result = decode('13n3n3n3n5l1p0p1p1p1p1p0');
+    expect(result.inputType).toBe('gcd');
+    expect(result.globalPrivacyControls).toBeDefined();
+    expect(result.globalPrivacyControls!.usPrivacyLawsOptedIn).toBe('yes');
+    expect(result.globalPrivacyControls!.usedContainerDefaults).toBe('no');
+    expect(result.globalPrivacyControls!.adPersonalizationSignals).toBe('yes');
+    expect(result.containerScopedDefaults).toBeDefined();
+    expect(result.containerScopedDefaults!.adStorage).toBe(true);
+    expect(result.containerScopedDefaults!.analyticsStorage).toBe(true);
+    expect(result.containerScopedDefaults!.adUserData).toBe(true);
+    expect(result.containerScopedDefaults!.adPersonalization).toBe(false);
+  });
+
+  it('parses partial metadata from network-style GCD', () => {
+    // 13n3n3n3n5l1 — only one code after '5': ['1']
+    const result = decode('13n3n3n3n5l1');
+    expect(result.inputType).toBe('gcd');
+    expect(result.globalPrivacyControls).toBeDefined();
+    expect(result.globalPrivacyControls!.usPrivacyLawsOptedIn).toBe('yes');
+    expect(result.globalPrivacyControls!.usedContainerDefaults).toBe('na');
+    expect(result.globalPrivacyControls!.adPersonalizationSignals).toBe('na');
+    expect(result.containerScopedDefaults!.adStorage).toBeNull();
+  });
+
+  it('returns no metadata for GCD without trailing characters', () => {
+    const result = decode('15051505');
+    expect(result.inputType).toBe('gcd');
+    expect(result.globalPrivacyControls).toBeUndefined();
+    expect(result.containerScopedDefaults).toBeUndefined();
+  });
+
+  it('returns no metadata for GCS input', () => {
+    const result = decode('G1111');
+    expect(result.inputType).toBe('gcs');
+    expect(result.globalPrivacyControls).toBeUndefined();
+    expect(result.containerScopedDefaults).toBeUndefined();
+  });
+
+  it('parses metadata from standard GCD with trailing chars', () => {
+    // 15051505x1x1x1 (7 signal pairs = 14 chars) + 01011110 (8 metadata chars)
+    const result = decode('15051505x1x1x101011110');
+    expect(result.inputType).toBe('gcd');
+    expect(result.globalPrivacyControls).toBeDefined();
+    expect(result.globalPrivacyControls!.usPrivacyLawsOptedIn).toBe('no');
+    expect(result.globalPrivacyControls!.usedContainerDefaults).toBe('yes');
+    expect(result.globalPrivacyControls!.adPersonalizationSignals).toBe('no');
+    expect(result.containerScopedDefaults!.adStorage).toBe(true);
+    expect(result.containerScopedDefaults!.analyticsStorage).toBe(true);
+    expect(result.containerScopedDefaults!.adPersonalization).toBe(true);
+    expect(result.containerScopedDefaults!.usedContainerScopedDefaults).toBe(false);
+  });
+
+  it('parses usedContainerScopedDefaults flag', () => {
+    const result = decode('13n3n3n3n5l0p1p0p1p1p1p1p1');
+    expect(result.containerScopedDefaults).toBeDefined();
+    expect(result.containerScopedDefaults!.usedContainerScopedDefaults).toBe(true);
+  });
+});
+
 describe('decode — invalid input', () => {
   it('returns unknown for empty string', () => {
     const result = decode('');
