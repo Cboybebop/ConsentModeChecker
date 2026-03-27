@@ -4,6 +4,15 @@ export type ConsentState = 'allowed' | 'denied' | 'unknown';
 export type ConsentSource = 'default' | 'update';
 export type ConsentMode = 'basic' | 'advanced' | 'unknown';
 export type OverallStatus = 'active' | 'incomplete' | 'missing';
+export type TriState = 'yes' | 'no' | 'na';
+export type LifecycleState = 'granted' | 'denied' | 'unset';
+
+export interface ConsentBreakdown {
+  implicit: LifecycleState;
+  declare: LifecycleState;
+  default: LifecycleState;
+  update: LifecycleState;
+}
 
 export interface SignalResult {
   name: string;
@@ -13,6 +22,21 @@ export interface SignalResult {
   mode: ConsentMode;
   statusLabel: string;
   implication: string;
+  breakdown?: ConsentBreakdown;
+}
+
+export interface GlobalPrivacyControls {
+  usPrivacyLawsOptedIn: TriState;
+  usedContainerDefaults: TriState;
+  adPersonalizationSignals: TriState;
+}
+
+export interface ContainerScopedDefaults {
+  adStorage: boolean | null;
+  analyticsStorage: boolean | null;
+  adUserData: boolean | null;
+  adPersonalization: boolean | null;
+  usedContainerScopedDefaults: boolean | null;
 }
 
 export interface DecodeResult {
@@ -21,6 +45,8 @@ export interface DecodeResult {
   overallSummary: string;
   signals: SignalResult[];
   rawInput: string;
+  globalPrivacyControls?: GlobalPrivacyControls;
+  containerScopedDefaults?: ContainerScopedDefaults;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,15 +272,116 @@ function parseCompactGcdCode(ch: string | undefined): {
   if (/[pqm]/i.test(ch)) return { state: 'denied', source: 'default', mode: 'unknown' };
   if (/[lx\-]/i.test(ch)) return { state: 'unknown', source: 'default', mode: 'unknown' };
 
-  // Numeric compact codes: preserve source/mode when possible.
-  if (/[1357]/.test(ch)) {
-    const { source, mode } = parseGcdSourceMode(ch);
-    return { state: 'denied', source, mode };
+  // Numeric compact codes: bit 0 determines granted(1) vs denied(0).
+  // Bit 1 = has default command, bit 2 = has update command.
+  const num = parseInt(ch, 10);
+  if (!isNaN(num) && num >= 0 && num <= 9) {
+    const state: ConsentState = num & 1 ? 'allowed' : 'denied';
+    const hasUpdate = !!(num & 4);
+    const source: ConsentSource = hasUpdate ? 'update' : 'default';
+    return { state, source, mode: 'unknown' };
   }
-  if (ch === '0') return { state: 'denied', source: 'default', mode: 'unknown' };
-  if (ch === '1') return { state: 'allowed', source: 'default', mode: 'basic' };
 
   return { state: 'unknown', source: 'default', mode: 'unknown' };
+}
+
+// ---------------------------------------------------------------------------
+// GCD metadata parsing (trailing characters after consent signal pairs)
+// ---------------------------------------------------------------------------
+// After the consent signal pairs, the GCD parameter may encode additional
+// metadata about privacy controls and container-scoped defaults.
+//
+// Positional mapping for trailing metadata characters:
+//   Position 0: US Privacy Laws opted in (1=yes, 0=no, else N/A)
+//   Position 1: Used Container Defaults (1=yes, 0=no, else N/A)
+//   Position 2: Ad Personalization Signals (1=yes, 0=no, else N/A)
+//   Position 3: Container-scoped default for ad_storage (1=true, 0=false)
+//   Position 4: Container-scoped default for analytics_storage (1=true, 0=false)
+//   Position 5: Container-scoped default for ad_user_data (1=true, 0=false)
+//   Position 6: Container-scoped default for ad_personalization (1=true, 0=false)
+//   Position 7: UsedContainerScopedDefaults flag (1=true, 0=false)
+
+interface GcdMetadata {
+  globalPrivacyControls: GlobalPrivacyControls;
+  containerScopedDefaults: ContainerScopedDefaults;
+}
+
+function parseTriState(ch: string | undefined): TriState {
+  if (ch === '1') return 'yes';
+  if (ch === '0') return 'no';
+  return 'na';
+}
+
+function parseBoolFlag(ch: string | undefined): boolean | null {
+  if (ch === '1') return true;
+  if (ch === '0') return false;
+  return null;
+}
+
+function parseGcdMetadata(metaChars: string[]): GcdMetadata | null {
+  if (metaChars.length === 0) return null;
+
+  return {
+    globalPrivacyControls: {
+      usPrivacyLawsOptedIn: parseTriState(metaChars[0]),
+      usedContainerDefaults: parseTriState(metaChars[1]),
+      adPersonalizationSignals: parseTriState(metaChars[2]),
+    },
+    containerScopedDefaults: {
+      adStorage: parseBoolFlag(metaChars[3]),
+      analyticsStorage: parseBoolFlag(metaChars[4]),
+      adUserData: parseBoolFlag(metaChars[5]),
+      adPersonalization: parseBoolFlag(metaChars[6]),
+      usedContainerScopedDefaults: parseBoolFlag(metaChars[7]),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Consent breakdown helpers
+// ---------------------------------------------------------------------------
+
+function toLifecycleState(state: ConsentState): LifecycleState {
+  if (state === 'allowed') return 'granted';
+  if (state === 'denied') return 'denied';
+  return 'unset';
+}
+
+/** Compute breakdown for a network-style signal from its compact code + separator. */
+function computeNetworkBreakdown(code: string, separator: string): ConsentBreakdown {
+  const parsed = parseCompactGcdCode(code);
+  const effective = toLifecycleState(parsed.state);
+
+  if (effective === 'unset') {
+    return { implicit: 'unset', declare: 'unset', default: 'unset', update: 'unset' };
+  }
+
+  const sepLower = separator.toLowerCase();
+  return {
+    implicit: effective,
+    declare: sepLower === 'r' ? effective : 'unset',
+    default: sepLower === 'd' ? effective : 'unset',
+    update: sepLower === 'u' || sepLower === 'm' ? effective : 'unset',
+  };
+}
+
+/** Compute breakdown for a standard GCD pair from state char + meta char. */
+function computeStandardBreakdown(state: ConsentState, metaChar: string | undefined): ConsentBreakdown {
+  const effective = toLifecycleState(state);
+
+  if (effective === 'unset') {
+    return { implicit: 'unset', declare: 'unset', default: 'unset', update: 'unset' };
+  }
+
+  const isDefault = metaChar === '1' || metaChar === '3';
+  const isUpdate = metaChar === '5' || metaChar === '7';
+
+  return {
+    implicit: effective,
+    declare: 'unset',
+    default: isDefault ? effective : 'unset',
+    update: isUpdate ? effective : 'unset',
+  };
 }
 
 function decodeNetworkStyleGcd(input: string): DecodeResult | null {
@@ -263,14 +390,19 @@ function decodeNetworkStyleGcd(input: string): DecodeResult | null {
 
   // Parse shape: 1<code><sep><code><sep>... where sep is often a letter (e.g. n/m/l).
   const codes: string[] = [];
+  const separators: string[] = [];
   let i = 1;
   while (i < trimmed.length) {
     const code = trimmed[i];
     codes.push(code);
     i += 1;
-    if (i >= trimmed.length) break;
+    if (i >= trimmed.length) {
+      separators.push('');
+      break;
+    }
     const sep = trimmed[i];
     if (!/[a-z]/i.test(sep)) return null;
+    separators.push(sep);
     i += 1;
   }
 
@@ -278,10 +410,13 @@ function decodeNetworkStyleGcd(input: string): DecodeResult | null {
   if (endIdx < 4) return null;
 
   const signalCodes = codes.slice(0, endIdx).slice(0, SIGNAL_DEFS.length + EXTENDED_SIGNAL_DEFS.length);
+  const signalSeps = separators.slice(0, endIdx);
+  const metaCodes = codes.slice(endIdx + 1);
   const allDefs = [...SIGNAL_DEFS, ...EXTENDED_SIGNAL_DEFS];
 
   const signals: SignalResult[] = signalCodes.map((code, idx) => {
     const { state, source, mode } = parseCompactGcdCode(code);
+    const sep = signalSeps[idx] ?? '';
     const def = allDefs[idx];
     return {
       name: def.name,
@@ -291,6 +426,7 @@ function decodeNetworkStyleGcd(input: string): DecodeResult | null {
       mode,
       statusLabel: statusLabel(state, source),
       implication: implicationText(def.name, state),
+      breakdown: computeNetworkBreakdown(code, sep),
     };
   });
 
@@ -304,7 +440,18 @@ function decodeNetworkStyleGcd(input: string): DecodeResult | null {
         ? 'Consent Mode is partially configured — some signals could not be determined from this GCD value.'
         : 'Consent Mode does not appear to be active based on this GCD value.';
 
-  return { inputType: 'gcd', overallStatus, overallSummary, signals, rawInput: trimmed };
+  const metadata = parseGcdMetadata(metaCodes);
+  return {
+    inputType: 'gcd',
+    overallStatus,
+    overallSummary,
+    signals,
+    rawInput: trimmed,
+    ...(metadata && {
+      globalPrivacyControls: metadata.globalPrivacyControls,
+      containerScopedDefaults: metadata.containerScopedDefaults,
+    }),
+  };
 }
 
 function decodeGcd(input: string): DecodeResult {
@@ -344,6 +491,7 @@ function decodeGcd(input: string): DecodeResult {
       mode,
       statusLabel: statusLabel(state, source),
       implication: implicationText(def.name, state),
+      breakdown: computeStandardBreakdown(state, metaChar),
     });
   }
 
@@ -358,6 +506,9 @@ function decodeGcd(input: string): DecodeResult {
         ? 'Consent Mode is partially configured — some signals could not be determined from this GCD value.'
         : 'Consent Mode does not appear to be active based on this GCD value.';
 
+  // Note: metadata parsing is only supported for network-style GCD (which has
+  // an explicit '5' end-marker). The standard/delimited format lacks a reliable
+  // boundary between signal pairs and trailing metadata characters.
   return { inputType: 'gcd', overallStatus, overallSummary, signals, rawInput: trimmed };
 }
 

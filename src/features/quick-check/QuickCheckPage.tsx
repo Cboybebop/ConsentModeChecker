@@ -9,6 +9,9 @@ import { QUICK_CHECK } from '../../constants/text';
 import { SummaryBanner } from './SummaryBanner';
 import { ConsentGrid } from './ConsentGrid';
 import { NextStepsPanel } from './NextStepsPanel';
+import { GlobalPrivacyPanel } from './GlobalPrivacyPanel';
+import { ContainerScopedDefaultsPanel } from './ContainerScopedDefaultsPanel';
+import { ConsentAnalysisTable } from './ConsentAnalysisTable';
 import { HowToFindCode } from './HowToFindCode';
 import { useAuth } from '../auth/useAuth';
 import { supabaseEnabled } from '../../lib/supabaseClient';
@@ -135,6 +138,15 @@ export function QuickCheckPage() {
             <>
               <SummaryBanner status={result.overallStatus} summary={result.overallSummary} />
               <ConsentGrid signals={result.signals} />
+              {result.inputType === 'gcd' && (
+                <ConsentAnalysisTable signals={result.signals} />
+              )}
+              {result.inputType === 'gcd' && result.globalPrivacyControls && (
+                <GlobalPrivacyPanel data={result.globalPrivacyControls} />
+              )}
+              {result.inputType === 'gcd' && result.containerScopedDefaults && (
+                <ContainerScopedDefaultsPanel data={result.containerScopedDefaults} />
+              )}
               <NextStepsPanel signals={result.signals} />
               <div>
                 <Button variant="secondary" onClick={() => setSaveOpen(true)}>
