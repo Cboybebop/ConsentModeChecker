@@ -11,6 +11,7 @@ import { ConsentGrid } from './ConsentGrid';
 import { NextStepsPanel } from './NextStepsPanel';
 import { GlobalPrivacyPanel } from './GlobalPrivacyPanel';
 import { ContainerScopedDefaultsPanel } from './ContainerScopedDefaultsPanel';
+import { ConsentAnalysisTable } from './ConsentAnalysisTable';
 import { HowToFindCode } from './HowToFindCode';
 import { useAuth } from '../auth/useAuth';
 import { supabaseEnabled } from '../../lib/supabaseClient';
@@ -137,6 +138,9 @@ export function QuickCheckPage() {
             <>
               <SummaryBanner status={result.overallStatus} summary={result.overallSummary} />
               <ConsentGrid signals={result.signals} />
+              {result.inputType === 'gcd' && (
+                <ConsentAnalysisTable signals={result.signals} />
+              )}
               {result.inputType === 'gcd' && result.globalPrivacyControls && (
                 <GlobalPrivacyPanel data={result.globalPrivacyControls} />
               )}

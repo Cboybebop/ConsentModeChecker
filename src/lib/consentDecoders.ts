@@ -5,6 +5,14 @@ export type ConsentSource = 'default' | 'update';
 export type ConsentMode = 'basic' | 'advanced' | 'unknown';
 export type OverallStatus = 'active' | 'incomplete' | 'missing';
 export type TriState = 'yes' | 'no' | 'na';
+export type LifecycleState = 'granted' | 'denied' | 'unset';
+
+export interface ConsentBreakdown {
+  implicit: LifecycleState;
+  declare: LifecycleState;
+  default: LifecycleState;
+  update: LifecycleState;
+}
 
 export interface SignalResult {
   name: string;
@@ -14,6 +22,7 @@ export interface SignalResult {
   mode: ConsentMode;
   statusLabel: string;
   implication: string;
+  breakdown?: ConsentBreakdown;
 }
 
 export interface GlobalPrivacyControls {
@@ -263,13 +272,15 @@ function parseCompactGcdCode(ch: string | undefined): {
   if (/[pqm]/i.test(ch)) return { state: 'denied', source: 'default', mode: 'unknown' };
   if (/[lx\-]/i.test(ch)) return { state: 'unknown', source: 'default', mode: 'unknown' };
 
-  // Numeric compact codes: preserve source/mode when possible.
-  if (/[1357]/.test(ch)) {
-    const { source, mode } = parseGcdSourceMode(ch);
-    return { state: 'denied', source, mode };
+  // Numeric compact codes: bit 0 determines granted(1) vs denied(0).
+  // Bit 1 = has default command, bit 2 = has update command.
+  const num = parseInt(ch, 10);
+  if (!isNaN(num) && num >= 0 && num <= 9) {
+    const state: ConsentState = num & 1 ? 'allowed' : 'denied';
+    const hasUpdate = !!(num & 4);
+    const source: ConsentSource = hasUpdate ? 'update' : 'default';
+    return { state, source, mode: 'unknown' };
   }
-  if (ch === '0') return { state: 'denied', source: 'default', mode: 'unknown' };
-  if (ch === '1') return { state: 'allowed', source: 'default', mode: 'basic' };
 
   return { state: 'unknown', source: 'default', mode: 'unknown' };
 }
@@ -326,20 +337,72 @@ function parseGcdMetadata(metaChars: string[]): GcdMetadata | null {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Consent breakdown helpers
+// ---------------------------------------------------------------------------
+
+function toLifecycleState(state: ConsentState): LifecycleState {
+  if (state === 'allowed') return 'granted';
+  if (state === 'denied') return 'denied';
+  return 'unset';
+}
+
+/** Compute breakdown for a network-style signal from its compact code + separator. */
+function computeNetworkBreakdown(code: string, separator: string): ConsentBreakdown {
+  const parsed = parseCompactGcdCode(code);
+  const effective = toLifecycleState(parsed.state);
+
+  if (effective === 'unset') {
+    return { implicit: 'unset', declare: 'unset', default: 'unset', update: 'unset' };
+  }
+
+  const sepLower = separator.toLowerCase();
+  return {
+    implicit: effective,
+    declare: sepLower === 'r' ? effective : 'unset',
+    default: sepLower === 'd' ? effective : 'unset',
+    update: sepLower === 'u' || sepLower === 'm' ? effective : 'unset',
+  };
+}
+
+/** Compute breakdown for a standard GCD pair from state char + meta char. */
+function computeStandardBreakdown(state: ConsentState, metaChar: string | undefined): ConsentBreakdown {
+  const effective = toLifecycleState(state);
+
+  if (effective === 'unset') {
+    return { implicit: 'unset', declare: 'unset', default: 'unset', update: 'unset' };
+  }
+
+  const isDefault = metaChar === '1' || metaChar === '3';
+  const isUpdate = metaChar === '5' || metaChar === '7';
+
+  return {
+    implicit: effective,
+    declare: 'unset',
+    default: isDefault ? effective : 'unset',
+    update: isUpdate ? effective : 'unset',
+  };
+}
+
 function decodeNetworkStyleGcd(input: string): DecodeResult | null {
   const trimmed = input.trim();
   if (!trimmed.toLowerCase().startsWith('1')) return null;
 
   // Parse shape: 1<code><sep><code><sep>... where sep is often a letter (e.g. n/m/l).
   const codes: string[] = [];
+  const separators: string[] = [];
   let i = 1;
   while (i < trimmed.length) {
     const code = trimmed[i];
     codes.push(code);
     i += 1;
-    if (i >= trimmed.length) break;
+    if (i >= trimmed.length) {
+      separators.push('');
+      break;
+    }
     const sep = trimmed[i];
     if (!/[a-z]/i.test(sep)) return null;
+    separators.push(sep);
     i += 1;
   }
 
@@ -347,11 +410,13 @@ function decodeNetworkStyleGcd(input: string): DecodeResult | null {
   if (endIdx < 4) return null;
 
   const signalCodes = codes.slice(0, endIdx).slice(0, SIGNAL_DEFS.length + EXTENDED_SIGNAL_DEFS.length);
+  const signalSeps = separators.slice(0, endIdx);
   const metaCodes = codes.slice(endIdx + 1);
   const allDefs = [...SIGNAL_DEFS, ...EXTENDED_SIGNAL_DEFS];
 
   const signals: SignalResult[] = signalCodes.map((code, idx) => {
     const { state, source, mode } = parseCompactGcdCode(code);
+    const sep = signalSeps[idx] ?? '';
     const def = allDefs[idx];
     return {
       name: def.name,
@@ -361,6 +426,7 @@ function decodeNetworkStyleGcd(input: string): DecodeResult | null {
       mode,
       statusLabel: statusLabel(state, source),
       implication: implicationText(def.name, state),
+      breakdown: computeNetworkBreakdown(code, sep),
     };
   });
 
@@ -425,6 +491,7 @@ function decodeGcd(input: string): DecodeResult {
       mode,
       statusLabel: statusLabel(state, source),
       implication: implicationText(def.name, state),
+      breakdown: computeStandardBreakdown(state, metaChar),
     });
   }
 

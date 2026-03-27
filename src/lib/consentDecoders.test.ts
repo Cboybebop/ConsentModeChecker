@@ -124,17 +124,46 @@ describe('decode GCD', () => {
   });
 
   it('decodes compact network-style GCD with n separators', () => {
+    // Code '3' = binary 011 → bit 0 = 1 → granted
     const result = decode('13n3n3n3n5l1');
     expect(result.inputType).toBe('gcd');
     expect(result.signals).toHaveLength(4);
-    expect(result.signals.every((s) => s.state === 'denied')).toBe(true);
+    expect(result.signals.every((s) => s.state === 'allowed')).toBe(true);
   });
 
   it('decodes compact network-style GCD with m separators', () => {
     const result = decode('13m3m3m3m5l1');
     expect(result.inputType).toBe('gcd');
     expect(result.signals).toHaveLength(4);
-    expect(result.signals.every((s) => s.state === 'denied')).toBe(true);
+    expect(result.signals.every((s) => s.state === 'allowed')).toBe(true);
+  });
+
+  it('decodes network-style GCD with mixed granted/denied codes', () => {
+    // 13l3l3R2l5l1 → codes ['3','3','3','2'], seps ['l','l','R','l']
+    // Code 3 (bit 0=1) → granted, Code 2 (bit 0=0) → denied
+    const result = decode('13l3l3R2l5l1');
+    expect(result.inputType).toBe('gcd');
+    expect(result.signals).toHaveLength(4);
+    expect(result.signals[0].state).toBe('allowed');  // ad_storage: code 3
+    expect(result.signals[1].state).toBe('allowed');  // analytics_storage: code 3
+    expect(result.signals[2].state).toBe('allowed');  // ad_user_data: code 3
+    expect(result.signals[3].state).toBe('denied');   // ad_personalization: code 2
+  });
+
+  it('populates consent breakdown from compact codes and separators', () => {
+    const result = decode('13l3l3R2l5l1');
+    // ad_storage (code 3, sep l): implicit=granted, rest unset
+    expect(result.signals[0].breakdown).toEqual({
+      implicit: 'granted', declare: 'unset', default: 'unset', update: 'unset',
+    });
+    // ad_user_data (code 3, sep R): implicit=granted, declare=granted
+    expect(result.signals[2].breakdown).toEqual({
+      implicit: 'granted', declare: 'granted', default: 'unset', update: 'unset',
+    });
+    // ad_personalization (code 2, sep l): implicit=denied, rest unset
+    expect(result.signals[3].breakdown).toEqual({
+      implicit: 'denied', declare: 'unset', default: 'unset', update: 'unset',
+    });
   });
 });
 
@@ -181,6 +210,25 @@ describe('decode GCD metadata', () => {
     expect(result.inputType).toBe('gcs');
     expect(result.globalPrivacyControls).toBeUndefined();
     expect(result.containerScopedDefaults).toBeUndefined();
+  });
+
+  it('populates breakdown for standard GCD pairs', () => {
+    // 15051505: pairs 15(allowed+update), 05(denied+update), 15, 05
+    const result = decode('15051505');
+    expect(result.signals[0].breakdown).toEqual({
+      implicit: 'granted', declare: 'unset', default: 'unset', update: 'granted',
+    });
+    expect(result.signals[1].breakdown).toEqual({
+      implicit: 'denied', declare: 'unset', default: 'unset', update: 'denied',
+    });
+    // 11011101: pairs 11(allowed+default), 01(denied+default), 11, 01
+    const result2 = decode('11011101');
+    expect(result2.signals[0].breakdown).toEqual({
+      implicit: 'granted', declare: 'unset', default: 'granted', update: 'unset',
+    });
+    expect(result2.signals[1].breakdown).toEqual({
+      implicit: 'denied', declare: 'unset', default: 'denied', update: 'unset',
+    });
   });
 
   it('does not parse metadata from standard GCD (no reliable boundary)', () => {

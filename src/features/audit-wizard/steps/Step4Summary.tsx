@@ -5,6 +5,7 @@ import { ScorecardTable } from '../ScorecardTable';
 import { QualityGauge } from '../QualityGauge';
 import { GlobalPrivacyPanel } from '../../quick-check/GlobalPrivacyPanel';
 import { ContainerScopedDefaultsPanel } from '../../quick-check/ContainerScopedDefaultsPanel';
+import { ConsentAnalysisTable } from '../../quick-check/ConsentAnalysisTable';
 import { Button } from '../../../components/ui/Button';
 import { WIZARD } from '../../../constants/text';
 
@@ -50,6 +51,10 @@ export function Step4Summary({
 
       <QualityGauge value={result.qualityIndex} />
       <ScorecardTable rows={result.scorecard} />
+
+      {acceptResult && acceptResult.signals.some((s) => s.breakdown) && (
+        <ConsentAnalysisTable signals={acceptResult.signals} />
+      )}
 
       {(acceptResult?.globalPrivacyControls || rejectResult?.globalPrivacyControls) && (
         <GlobalPrivacyPanel
