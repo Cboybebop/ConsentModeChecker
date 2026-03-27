@@ -183,18 +183,14 @@ describe('decode GCD metadata', () => {
     expect(result.containerScopedDefaults).toBeUndefined();
   });
 
-  it('parses metadata from standard GCD with trailing chars', () => {
-    // 15051505x1x1x1 (7 signal pairs = 14 chars) + 01011110 (8 metadata chars)
-    const result = decode('15051505x1x1x101011110');
+  it('does not parse metadata from standard GCD (no reliable boundary)', () => {
+    // Standard/delimited GCD lacks an explicit end-marker, so trailing metadata
+    // cannot be reliably separated from signal pairs — metadata is only parsed
+    // from network-style GCD with the '5' end-marker.
+    const result = decode('15051505');
     expect(result.inputType).toBe('gcd');
-    expect(result.globalPrivacyControls).toBeDefined();
-    expect(result.globalPrivacyControls!.usPrivacyLawsOptedIn).toBe('no');
-    expect(result.globalPrivacyControls!.usedContainerDefaults).toBe('yes');
-    expect(result.globalPrivacyControls!.adPersonalizationSignals).toBe('no');
-    expect(result.containerScopedDefaults!.adStorage).toBe(true);
-    expect(result.containerScopedDefaults!.analyticsStorage).toBe(true);
-    expect(result.containerScopedDefaults!.adPersonalization).toBe(true);
-    expect(result.containerScopedDefaults!.usedContainerScopedDefaults).toBe(false);
+    expect(result.globalPrivacyControls).toBeUndefined();
+    expect(result.containerScopedDefaults).toBeUndefined();
   });
 
   it('parses usedContainerScopedDefaults flag', () => {
@@ -228,5 +224,12 @@ describe('decode — invalid input', () => {
     expect(decode('13n3n3n3n51').inputType).toBe('unknown');
     expect(detectInputType('15nn05')).toBe('unknown');
     expect(detectInputType('15n0z')).toBe('unknown');
+  });
+
+  it('rejects delimited GCD with dangling separator', () => {
+    expect(detectInputType('15n05n')).toBe('unknown');
+    expect(decode('15n05n').inputType).toBe('unknown');
+    expect(detectInputType('15.05.')).toBe('unknown');
+    expect(decode('15.05.').inputType).toBe('unknown');
   });
 });

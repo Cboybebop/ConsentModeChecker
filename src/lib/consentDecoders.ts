@@ -220,11 +220,9 @@ const GCD_STATE_CHAR = '[01x\\-]';
 const GCD_META_CHAR = '[1357x\\-]';
 const GCD_PAIR_PATTERN = `${GCD_STATE_CHAR}${GCD_META_CHAR}`;
 const GCD_DELIMITER_PATTERN = '[.n]';
-// Optional trailing metadata: up to 8 digits [01] after signal pairs
-const GCD_TRAILING_META = '[01]{0,8}';
-const GCD_PATTERN = new RegExp(`^${GCD_PAIR_PATTERN}(${GCD_PAIR_PATTERN}){1,6}${GCD_TRAILING_META}$`, 'i');
+const GCD_PATTERN = new RegExp(`^${GCD_PAIR_PATTERN}(${GCD_PAIR_PATTERN}){1,6}$`, 'i');
 const GCD_DELIMITED_PATTERN = new RegExp(
-  `^${GCD_PAIR_PATTERN}(${GCD_DELIMITER_PATTERN}${GCD_PAIR_PATTERN}){1,6}(${GCD_DELIMITER_PATTERN}${GCD_TRAILING_META})?$`,
+  `^${GCD_PAIR_PATTERN}(${GCD_DELIMITER_PATTERN}${GCD_PAIR_PATTERN}){1,6}$`,
   'i',
 );
 const GCD_CHAR_DELIMITED_PATTERN = new RegExp(
@@ -430,11 +428,6 @@ function decodeGcd(input: string): DecodeResult {
     });
   }
 
-  // Extract trailing metadata characters beyond signal pairs
-  const signalCharsUsed = signals.length * 2;
-  const trailingChars = normalised.slice(signalCharsUsed).split('');
-  const metadata = parseGcdMetadata(trailingChars);
-
   const knownCount = signals.filter((s) => s.state !== 'unknown').length;
   const overallStatus: OverallStatus =
     knownCount === 0 ? 'missing' : knownCount === signals.length ? 'active' : 'incomplete';
@@ -446,17 +439,10 @@ function decodeGcd(input: string): DecodeResult {
         ? 'Consent Mode is partially configured — some signals could not be determined from this GCD value.'
         : 'Consent Mode does not appear to be active based on this GCD value.';
 
-  return {
-    inputType: 'gcd',
-    overallStatus,
-    overallSummary,
-    signals,
-    rawInput: trimmed,
-    ...(metadata && {
-      globalPrivacyControls: metadata.globalPrivacyControls,
-      containerScopedDefaults: metadata.containerScopedDefaults,
-    }),
-  };
+  // Note: metadata parsing is only supported for network-style GCD (which has
+  // an explicit '5' end-marker). The standard/delimited format lacks a reliable
+  // boundary between signal pairs and trailing metadata characters.
+  return { inputType: 'gcd', overallStatus, overallSummary, signals, rawInput: trimmed };
 }
 
 // ---------------------------------------------------------------------------
